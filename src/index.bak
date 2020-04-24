@@ -1,0 +1,83 @@
+import axios from "axios";
+import { User } from "./models/User";
+
+/* const user = new User({ name: "Trang", age: 25 });
+user.set({ name: "Minh", age: 30 });
+// user.set({}); cũng ko bị lỗi gì cả dù hơi weird
+
+console.log(user.get("name"));
+console.log(user.get("age"));
+
+//register a new event on User
+user.on("sing", () => {
+  console.log("Change #1");
+});
+user.on("sing", () => {
+  console.log("Change #2");
+});
+user.on("dance", () => {
+  console.log("Change #3");
+});
+
+console.log(user); //to see that class User now has the 'change' event
+user.trigger("sing"); */
+
+// axios.post("http://localhost:3000/users", {
+//   name: "Trang",
+//   age: 25,
+// });
+
+//axios.get("http://localhost:3000/users/1");
+
+// const user = new User({ id: 1 }); //hard code, create a new user
+// //user.fetch(); //fetch về có cả name và age
+
+// user.set({ name: "New Name", age: 100 });
+// user.save(); //user này đã có trong db rồi => đây là put request
+
+// const user2 = new User({ name: "new record", age: 0 });
+// //user2.save();
+// user2.events.on("change", () => {
+//   console.log("Change");
+// });
+
+// user2.events.trigger("change");
+
+// user.attributes.get('id');
+// user.attributes.get('name');
+// user.attributes.get('age');
+
+// user.sync.save();
+
+// //Before...
+// user.save()
+
+/* Reminder on how 'this' works
+const colors = {
+  color: 'red',
+  printColor() {
+    console.log(this.color);
+  }
+}
+
+colors.printColor(); //red, this chính là cái bên trái của function đc call, ở đây là colors object, tức là khi call nó sẽ là colors.color = red;
+
+const myPrint = colors.printColor;
+myPrint(); //lúc này thì bên trái printColors ko có cái mẹ gì cả, tức là undefined => chính là gọi undefined.color
+ */
+
+// const user = new User({ name: "Trang", age: 0 });
+// console.log(user.get("name")); //this ở đây là user, khi get() chạy ở Attributes class thì this sẽ thay thế bằng user => undefined => đổi get thành arrow fn (a bound function), khi đó this sẽ luôn là Attributes.
+// user.on("change", () => {
+//   console.log("user was changed, we need to update some HTML");
+// });
+// //user.trigger("change");
+
+// user.set({ name: "Hoang Linh" });
+
+const user = new User({ id: 1, name: "America", age: 0 });
+user.on("save", () => {
+  console.log(user);
+});
+
+user.save(); //tại vì khi fetch xong sẽ set luôn => user updated

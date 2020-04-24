@@ -1,0 +1,68 @@
+//trc khi refactor
+import axios, { AxiosResponse } from "axios";
+
+interface UserProps {
+  id?: number;
+  name?: string;
+  age?: number;
+}
+
+type Callback = () => void; //type alias for function that takes no arg and returns no value
+
+export class User {
+  events: { [key: string]: Callback[] } = {};
+  //dùng để store các event listeners, là object có key là string, value là 1 dãy chứa các callback, initial value là empty object
+
+  constructor(private data: UserProps) {}
+
+  get(propName: string): string | number {
+    //return string or number
+    return this.data[propName];
+  }
+
+  set(update: UserProps): void {
+    Object.assign(this.data, update);
+    //iterate over update object and take at property one by one or use Object.assign: take all the properties on update, copy paste them to this.data, overwrite properties of this.data
+  }
+
+  on(eventName: string, callback: Callback): void {
+    //register new event listeners and trigger them some time in the future. phải handle cả trường hợp có callback và undefined
+    const handlers = this.events[eventName] || [];
+    handlers.push(callback);
+    //assign the callback back to event
+    this.events[eventName] = handlers;
+  }
+
+  trigger(eventName: string): void {
+    const handlers = this.events[eventName]; //có thể undefined đối với những event chưa đc register
+    if (!handlers || handlers.length === 0) {
+      return;
+    }
+
+    //loop qua từng callback and call them
+    handlers.forEach((callback) => {
+      callback();
+    });
+  }
+
+  fetch(): void {
+    //vẫn gắn void mặc dù cái này return Promise
+    axios
+      .get(`http://localhost:3000/users/${this.get("id")}`)
+      .then((res: AxiosResponse): void => {
+        this.set(res.data);
+      });
+  }
+
+  save(): void {
+    const id = this.get("id");
+
+    /* nếu có id, tức là user đã tồn tại trong db, thì sẽ update user đó, nếu chưa có id thì tạo user mới */
+
+    if (id) {
+      axios.put(`http://localhost:3000/users/${id}`, this.data);
+    } else {
+      axios.post("http://localhost:3000/users", this.data);
+    }
+  }
+}
