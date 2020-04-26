@@ -1,0 +1,91 @@
+import { User } from "../models/User";
+
+export class UserForm {
+  constructor(public parent: Element, public model: User) {
+    //tại sao ON CHANGE lại nằm ở constructor: when we create an instance of View class, we want to listen to the model that gets passed in, and listen specifically to the 'change' event. Nên split thành helper method, just want to keep constructor as simple as possibble
+    this.bindModel();
+  }
+
+  //helper method
+  bindModel(): void {
+    this.model.on("change", () => {
+      this.render();
+    });
+  }
+
+  eventsMap(): { [key: string]: () => void } {
+    return {
+      //"click:button": this.onButtonClick,
+      //"mouseover:h1": this.onHeaderHover,
+      "click:.set-age": this.onSetAgeClick,
+      "click:.set-name": this.onSetNameClick,
+    };
+  }
+
+  onButtonClick(): void {
+    console.log("Hi there");
+  }
+
+  onHeaderHover(): void {
+    console.log("H1 was hovered");
+  }
+
+  onSetAgeClick = (): void => {
+    this.model.setRandomAge();
+  };
+
+  onSetNameClick = (): void => {
+    //ở các framework thì chỗ này sẽ nhận event arg, ở đây cũng cho event vào đc nhưng mà event đó sẽ là event click, chứ ko phải là reference đến cái input => ko lấy đc text từ input => lấy trực tiếp từ DOM manually
+    const input = this.parent.querySelector("input");
+
+    if (input) {
+      //đây là bước type guard make sure là có input thì mới chạy 2 cái kia. Vì sau khi bật strictNullCheck thì có warning là input có thể bị null nên phải type guard
+      const name = input.value;
+      this.model.set({ name });
+    }
+  };
+
+  template(): string {
+    return `
+    <div>
+      <h1>User Form</h1>
+      <div>User name: ${this.model.get("name")}</div>
+      <div>User name: ${this.model.get("age")}</div>
+      <input />
+      <button class="set-name">Change name</button>
+      <button class="set-age">Set random age</button>
+    </div>
+    `;
+  }
+  //gọi đc this.model.get('name') vì User extends Model
+
+  //helper fn
+  bindEvents(fragment: DocumentFragment): void {
+    const eventsMap = this.eventsMap();
+    for (let eventKey in eventsMap) {
+      //eventKey is always a string
+      const [eventName, selector] = eventKey.split(":");
+      //find element in the fragment that matches selector, returns an array of all elements that match selector. Với mỗi element thì gắn 1 cái event listener, gồm tên event chính là eventName, và callback là value của eventsMap[eventKey], ví dụ như eventsMap['click:button'] sẽ là this.onButtonClick
+      fragment.querySelectorAll(selector).forEach((element) => {
+        element.addEventListener(eventName, eventsMap[eventKey]);
+      });
+    }
+  }
+
+  /* for...in statement iterates over all enumerable properties of an object that are keyed by strings  
+  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for...in */
+
+  render(): void {
+    this.parent.innerHTML = ""; //ban đầu ko có dòng này, mỗi lần render lại thêm 1 cục html mới, có dòng này thì khi render lại, vứt đống cũ đi thay thế bằng đống mới chứ ko nhân lên nữa. Với react hay angular thì nó sẽ tự compare DOM cũ và DOM mới nhưng mà làm thủ công thì làm thế này.
+
+    //tạo ra 1 cái element gọi là template <template></template>
+    const templateElement = document.createElement("template");
+    //gắn đống html đc trả về ở trên vào templateElement
+    templateElement.innerHTML = this.template(); //turns the string into actual html that is contained inside templateElement
+
+    this.bindEvents(templateElement.content);
+
+    this.parent.append(templateElement.content);
+    //content sẽ có type 'DocumentFragment'
+  }
+}

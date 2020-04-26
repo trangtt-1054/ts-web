@@ -117,7 +117,433 @@ parcelRequire = (function (modules, cache, entry, globalName) {
   }
 
   return newRequire;
-})({"node_modules/axios/lib/helpers/bind.js":[function(require,module,exports) {
+})({"src/views/CollectionView.ts":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var CollectionView =
+/** @class */
+function () {
+  function CollectionView(parent, collection) {
+    this.parent = parent;
+    this.collection = collection;
+  }
+
+  CollectionView.prototype.render = function () {
+    this.parent.innerHTML = "";
+    var templateElement = document.createElement("template");
+
+    for (var _i = 0, _a = this.collection.models; _i < _a.length; _i++) {
+      var model = _a[_i]; //1. build up a parent element
+
+      var itemParent = document.createElement("div"); //2. pass itemPrent to renderItem, create a view and attach it to itemParent
+
+      this.renderItem(model, itemParent); //3. now we have a div with some html inside it, append it to the big list templateElement
+
+      templateElement.content.append(itemParent);
+    } //4. when we iterate over models, take the templateElement and append it to the CollectionView's parent
+
+
+    this.parent.append(templateElement.content);
+  };
+
+  return CollectionView;
+}();
+
+exports.CollectionView = CollectionView;
+/*
+vì collection là generics class phải pass vào T,K cơ mà muốn thế thì CollectionView cũng phải là generics class thì mới có cái mà pass xuống cho con
+
+CollectionView is like super class, used to create any type of Collection View, it has a method called renderItem() that takes some instance of model and reference to some HTML Element (whre we want to render the view). It will be up to the child class to implement the renderItem.
+
+render() method will iterate over collection, for every MODEL inside that collection, we're gonna call renderItem to build up a VIEW for each single MODEL and render to the screen.
+*/
+},{}],"src/views/View.ts":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+}); // interface ModelForView {
+//   on(eventName: string, callback: () => void): void
+// }
+
+/* ở đây đang dùng interface để làm Generics Constraint nhưng có thể dùng class Model để làm Generic Constraints luôn. Vì class cũng là 1 type, so that we can make sure type T is an instance of Model. Nếu dùng interface thì đằng nào sau này cũng phải thêm method cho nó thoả mãn Model thì thôi dùng Model luôn cho nhanh
+
+vấn đề là bản thân Model cũng là 1 generics class => phải add thêm Type cho nó nữa, pass cái gì vào bây giờ => thêm 1 type K cho View, ko phải là để dùng cho bên trong class, mà là để làm generics type cho Model
+
+*/
+
+var View =
+/** @class */
+function () {
+  function View(parent, model) {
+    this.parent = parent;
+    this.model = model;
+    this.regions = {}; //tại sao ON CHANGE lại nằm ở constructor: when we create an instance of View class, we want to listen to the model that gets passed in, and listen specifically to the 'change' event. Nên split thành helper method, just want to keep constructor as simple as possibble
+
+    this.bindModel();
+  }
+
+  View.prototype.eventsMap = function () {
+    return {}; //eventsMap is no longer required to be implemented in the child class
+  }; //provide default implementation of regionsMap
+
+
+  View.prototype.regionsMap = function () {
+    return {};
+  }; //helper method
+
+
+  View.prototype.bindModel = function () {
+    var _this = this;
+
+    this.model.on("change", function () {
+      _this.render();
+    });
+  }; //helper fn
+
+
+  View.prototype.bindEvents = function (fragment) {
+    var eventsMap = this.eventsMap();
+
+    var _loop_1 = function _loop_1(eventKey) {
+      //eventKey is always a string
+      var _a = eventKey.split(":"),
+          eventName = _a[0],
+          selector = _a[1]; //find element in the fragment that matches selector, returns an array of all elements that match selector. Với mỗi element thì gắn 1 cái event listener, gồm tên event chính là eventName, và callback là value của eventsMap[eventKey], ví dụ như eventsMap['click:button'] sẽ là this.onButtonClick
+
+
+      fragment.querySelectorAll(selector).forEach(function (element) {
+        element.addEventListener(eventName, eventsMap[eventKey]);
+      });
+    };
+
+    for (var eventKey in eventsMap) {
+      _loop_1(eventKey);
+    }
+  };
+  /* for...in statement iterates over all enumerable properties of an object that are keyed by strings
+  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for...in */
+
+
+  View.prototype.mapRegions = function (fragment) {
+    //1. get a reference to regionsMap
+    var regionsMap = this.regionsMap(); //2. iterate through the object and find all the selectors inside it
+
+    for (var key in regionsMap) {
+      var selector = regionsMap[key]; //.user-show or .user-form
+      //3. find the element inside the template
+
+      var element = fragment.querySelector(selector);
+
+      if (element) {
+        this.regions[key] = element;
+      }
+    }
+  };
+
+  View.prototype.onRender = function () {}; //just a default implementation, the real nesting login is in UserEdit
+
+
+  View.prototype.render = function () {
+    this.parent.innerHTML = ""; //ban đầu ko có dòng này, mỗi lần render lại thêm 1 cục html mới, có dòng này thì khi render lại, vứt đống cũ đi thay thế bằng đống mới chứ ko nhân lên nữa. Với react hay angular thì nó sẽ tự compare DOM cũ và DOM mới nhưng mà làm thủ công thì làm thế này.
+    //tạo ra 1 cái element gọi là template <template></template>
+
+    var templateElement = document.createElement("template"); //gắn đống html đc trả về ở trên vào templateElement
+
+    templateElement.innerHTML = this.template(); //turns the string into actual html that is contained inside templateElement
+
+    this.bindEvents(templateElement.content);
+    this.mapRegions(templateElement.content); //SETUP VIEW NESTING, make sure everything nested before appending them to parent
+
+    this.onRender();
+    this.parent.append(templateElement.content); //content sẽ có type 'DocumentFragment'
+  };
+
+  return View;
+}();
+
+exports.View = View;
+},{}],"src/views/UserShow.ts":[function(require,module,exports) {
+"use strict";
+
+var __extends = this && this.__extends || function () {
+  var _extendStatics = function extendStatics(d, b) {
+    _extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) {
+        if (b.hasOwnProperty(p)) d[p] = b[p];
+      }
+    };
+
+    return _extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    _extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var View_1 = require("./View");
+
+var UserShow =
+/** @class */
+function (_super) {
+  __extends(UserShow, _super);
+
+  function UserShow() {
+    return _super !== null && _super.apply(this, arguments) || this;
+  }
+
+  UserShow.prototype.template = function () {
+    return "\n      <div>\n        <h1>User Details</h1>\n        <div>User Name: " + this.model.get("name") + "</div>\n        <div>Age: " + this.model.get("age") + "</div>\n      </div>\n    ";
+  };
+
+  return UserShow;
+}(View_1.View);
+
+exports.UserShow = UserShow;
+},{"./View":"src/views/View.ts"}],"src/views/UserList.ts":[function(require,module,exports) {
+"use strict";
+
+var __extends = this && this.__extends || function () {
+  var _extendStatics = function extendStatics(d, b) {
+    _extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) {
+        if (b.hasOwnProperty(p)) d[p] = b[p];
+      }
+    };
+
+    return _extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    _extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var CollectionView_1 = require("./CollectionView");
+
+var UserShow_1 = require("./UserShow");
+
+var UserList =
+/** @class */
+function (_super) {
+  __extends(UserList, _super);
+
+  function UserList() {
+    return _super !== null && _super.apply(this, arguments) || this;
+  }
+
+  UserList.prototype.renderItem = function (model, itemParent) {
+    //create a view, pass in model, render to itemParent
+    new UserShow_1.UserShow(itemParent, model).render();
+  };
+
+  return UserList;
+}(CollectionView_1.CollectionView);
+
+exports.UserList = UserList; //last thing to do: build up a collection and pass to UserList
+},{"./CollectionView":"src/views/CollectionView.ts","./UserShow":"src/views/UserShow.ts"}],"src/views/UserForm.ts":[function(require,module,exports) {
+"use strict";
+
+var __extends = this && this.__extends || function () {
+  var _extendStatics = function extendStatics(d, b) {
+    _extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) {
+        if (b.hasOwnProperty(p)) d[p] = b[p];
+      }
+    };
+
+    return _extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    _extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var View_1 = require("../views/View");
+
+var UserForm =
+/** @class */
+function (_super) {
+  __extends(UserForm, _super);
+
+  function UserForm() {
+    var _this = _super !== null && _super.apply(this, arguments) || this;
+
+    _this.onSetAgeClick = function () {
+      _this.model.setRandomAge();
+    };
+
+    _this.onSetNameClick = function () {
+      //ở các framework thì chỗ này sẽ nhận event arg, ở đây cũng cho event vào đc nhưng mà event đó sẽ là event click, chứ ko phải là reference đến cái input => ko lấy đc text từ input => lấy trực tiếp từ DOM manually
+      var input = _this.parent.querySelector("input");
+
+      if (input) {
+        //đây là bước type guard make sure là có input thì mới chạy 2 cái kia. Vì sau khi bật strictNullCheck thì có warning là input có thể bị null nên phải type guard
+        var name = input.value;
+
+        _this.model.set({
+          name: name
+        });
+      }
+    };
+
+    _this.onSaveClick = function () {
+      _this.model.save();
+    };
+
+    return _this; //gọi đc this.model.get('name') vì User extends Model
+  } //extends cái là dùng đc tất của bên View luôn, ví dụ this.model sẽ trỏ về View.model
+
+
+  UserForm.prototype.eventsMap = function () {
+    return {
+      //"click:button": this.onButtonClick,
+      //"mouseover:h1": this.onHeaderHover,
+      "click:.set-age": this.onSetAgeClick,
+      "click:.set-name": this.onSetNameClick,
+      "click:.save-model": this.onSaveClick
+    };
+  };
+
+  UserForm.prototype.onButtonClick = function () {
+    console.log("Hi there");
+  };
+
+  UserForm.prototype.onHeaderHover = function () {
+    console.log("H1 was hovered");
+  };
+
+  UserForm.prototype.template = function () {
+    return "\n    <div>\n      <input placeholder=\"" + this.model.get("name") + "\"/>\n      <button class=\"set-name\">Change name</button>\n      <button class=\"set-age\">Set random age</button>\n      <button class=\"save-model\">Save user</button>\n\n    </div>\n    ";
+  };
+
+  return UserForm;
+}(View_1.View);
+
+exports.UserForm = UserForm;
+},{"../views/View":"src/views/View.ts"}],"src/views/UserEdit.ts":[function(require,module,exports) {
+"use strict";
+
+var __extends = this && this.__extends || function () {
+  var _extendStatics = function extendStatics(d, b) {
+    _extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) {
+        if (b.hasOwnProperty(p)) d[p] = b[p];
+      }
+    };
+
+    return _extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    _extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var View_1 = require("./View");
+
+var UserForm_1 = require("./UserForm");
+
+var UserShow_1 = require("./UserShow");
+
+var UserEdit =
+/** @class */
+function (_super) {
+  __extends(UserEdit, _super);
+
+  function UserEdit() {
+    return _super !== null && _super.apply(this, arguments) || this;
+  } //1. define a regionsMap method that will overwrite the regionsMap of View class
+
+
+  UserEdit.prototype.regionsMap = function () {
+    return {
+      userShow: ".user-show",
+      userForm: ".user-form"
+    };
+  };
+
+  UserEdit.prototype.onRender = function () {
+    //do our nesting, UserShow extends View, mà View cần parent & model => UserShow cũng cần
+    new UserShow_1.UserShow(this.regions.userShow, this.model).render();
+    new UserForm_1.UserForm(this.regions.userForm, this.model).render();
+  };
+
+  UserEdit.prototype.template = function () {
+    return "\n      <div>\n        <div class=\"user-show\"></div>\n        <div class=\"user-form\"></div>\n      </div>\n    ";
+  };
+
+  return UserEdit;
+}(View_1.View);
+
+exports.UserEdit = UserEdit;
+/* everytime we render UserEdit, we need to get a reference to the user-show div (create an instance of UserShow and pass in the div as UserShow's parent element)
+
+when we render UserEdit to the DOM, the render() method will call mapRegions(), mapRegions() will look at the regionsMap() THAT WE DEFINED INSIDE UserEdit, loop through the key-value and find the element that matches the selector, once it find the element, it will add to the regions property
+*/
+},{"./View":"src/views/View.ts","./UserForm":"src/views/UserForm.ts","./UserShow":"src/views/UserShow.ts"}],"node_modules/axios/lib/helpers/bind.js":[function(require,module,exports) {
 'use strict';
 
 module.exports = function bind(fn, thisArg) {
@@ -1880,7 +2306,110 @@ module.exports.default = axios;
 
 },{"./utils":"node_modules/axios/lib/utils.js","./helpers/bind":"node_modules/axios/lib/helpers/bind.js","./core/Axios":"node_modules/axios/lib/core/Axios.js","./core/mergeConfig":"node_modules/axios/lib/core/mergeConfig.js","./defaults":"node_modules/axios/lib/defaults.js","./cancel/Cancel":"node_modules/axios/lib/cancel/Cancel.js","./cancel/CancelToken":"node_modules/axios/lib/cancel/CancelToken.js","./cancel/isCancel":"node_modules/axios/lib/cancel/isCancel.js","./helpers/spread":"node_modules/axios/lib/helpers/spread.js"}],"node_modules/axios/index.js":[function(require,module,exports) {
 module.exports = require('./lib/axios');
-},{"./lib/axios":"node_modules/axios/lib/axios.js"}],"src/models/Model.ts":[function(require,module,exports) {
+},{"./lib/axios":"node_modules/axios/lib/axios.js"}],"src/models/Eventing.ts":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var Eventing =
+/** @class */
+function () {
+  function Eventing() {
+    var _this = this;
+
+    this.events = {}; //dùng để store các event listeners, là object có key là string, value là 1 dãy chứa các callback, initial value là empty object
+
+    this.on = function (eventName, callback) {
+      //register new event listeners and trigger them some time in the future. phải handle cả trường hợp có callback và undefined
+      var handlers = _this.events[eventName] || [];
+      handlers.push(callback); //assign the callback back to event
+
+      _this.events[eventName] = handlers;
+    };
+
+    this.trigger = function (eventName) {
+      var handlers = _this.events[eventName]; //có thể undefined đối với những event chưa đc register
+
+      if (!handlers || handlers.length === 0) {
+        return;
+      } //loop qua từng callback and call them
+
+
+      handlers.forEach(function (callback) {
+        callback();
+      });
+    };
+  }
+
+  return Eventing;
+}();
+
+exports.Eventing = Eventing;
+},{}],"src/models/Collection.ts":[function(require,module,exports) {
+"use strict"; //như kiểu query, fetch toàn bộ user trước để biết là đã có user nào trong db từ đó mới fetch detail, vì nhỡ xảy ra trường hợp fetch 1 cái id mà ko biết id đó đã có trong db hay chưa
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var axios_1 = __importDefault(require("axios"));
+
+var Eventing_1 = require("./Eventing"); //T, K là 2 generics Type, T for User, K for UserProps
+
+
+var Collection =
+/** @class */
+function () {
+  function Collection(rootUrl, deserialize //takes in some json data and turns into instance of actual object
+  ) {
+    this.rootUrl = rootUrl;
+    this.deserialize = deserialize;
+    this.models = [];
+    this.events = new Eventing_1.Eventing();
+  }
+
+  Object.defineProperty(Collection.prototype, "on", {
+    get: function get() {
+      return this.events.on; //ko đc dùng shortcut on = ... khi initialize Eventing inline như trên kia
+    },
+    enumerable: true,
+    configurable: true
+  });
+  Object.defineProperty(Collection.prototype, "trigger", {
+    get: function get() {
+      return this.events.trigger;
+    },
+    enumerable: true,
+    configurable: true
+  });
+
+  Collection.prototype.fetch = function () {
+    var _this = this; //take the value from res, take each of the object and turn into an instance of User and add to the models array
+
+
+    axios_1.default.get(this.rootUrl).then(function (res) {
+      res.data.forEach(function (value) {
+        //const user = User.buildUser(value); //chỗ này là object User => cho constructor nhận thêm some JSON data and returns an instance of Model => thêm deserialize
+        _this.models.push(_this.deserialize(value));
+      });
+
+      _this.trigger("change");
+    });
+  };
+
+  return Collection;
+}();
+
+exports.Collection = Collection;
+},{"axios":"node_modules/axios/index.js","./Eventing":"src/models/Eventing.ts"}],"src/models/Model.ts":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -2037,48 +2566,7 @@ function () {
 }();
 
 exports.ApiSync = ApiSync;
-},{"axios":"node_modules/axios/index.js"}],"src/models/Eventing.ts":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-
-var Eventing =
-/** @class */
-function () {
-  function Eventing() {
-    var _this = this;
-
-    this.events = {}; //dùng để store các event listeners, là object có key là string, value là 1 dãy chứa các callback, initial value là empty object
-
-    this.on = function (eventName, callback) {
-      //register new event listeners and trigger them some time in the future. phải handle cả trường hợp có callback và undefined
-      var handlers = _this.events[eventName] || [];
-      handlers.push(callback); //assign the callback back to event
-
-      _this.events[eventName] = handlers;
-    };
-
-    this.trigger = function (eventName) {
-      var handlers = _this.events[eventName]; //có thể undefined đối với những event chưa đc register
-
-      if (!handlers || handlers.length === 0) {
-        return;
-      } //loop qua từng callback and call them
-
-
-      handlers.forEach(function (callback) {
-        callback();
-      });
-    };
-  }
-
-  return Eventing;
-}();
-
-exports.Eventing = Eventing;
-},{}],"src/models/User.ts":[function(require,module,exports) {
+},{"axios":"node_modules/axios/index.js"}],"src/models/User.ts":[function(require,module,exports) {
 "use strict";
 
 var __extends = this && this.__extends || function () {
@@ -2119,6 +2607,8 @@ var ApiSync_1 = require("./ApiSync");
 
 var Eventing_1 = require("./Eventing");
 
+var Collection_1 = require("./Collection");
+
 var rootUrl = "http://localhost:3000/users";
 
 var User =
@@ -2134,93 +2624,111 @@ function (_super) {
   User.buildUser = function (attrs) {
     return new User(new Attributes_1.Attributes(attrs), new Eventing_1.Eventing(), new ApiSync_1.ApiSync(rootUrl));
   };
+  /* giả sử muốn save user vào local storage thì chỉ cần đổi cái sync đi là đc
+  static buildLocalUser(attrs: UserProps) {
+    return new User(
+      new Attributes<UserProps>(attrs),
+      new Eventing(),
+      new LocalSync<UserProps>(rootUrl)
+    );
+  } */
+  //ko nên initialize Collection ở index.ts nên đưa vào đây
+
+
+  User.buildUserCollection = function () {
+    return new Collection_1.Collection(rootUrl, function (json) {
+      return User.buildUser(json);
+    });
+  };
+
+  User.prototype.setRandomAge = function () {
+    var age = Math.round(Math.random() * 100);
+    this.set({
+      age: age
+    });
+  };
 
   return User;
 }(Model_1.Model);
 
 exports.User = User;
-},{"./Model":"src/models/Model.ts","./Attributes":"src/models/Attributes.ts","./ApiSync":"src/models/ApiSync.ts","./Eventing":"src/models/Eventing.ts"}],"src/models/Collection.ts":[function(require,module,exports) {
-"use strict"; //như kiểu query, fetch toàn bộ user trước để biết là đã có user nào trong db từ đó mới fetch detail, vì nhỡ xảy ra trường hợp fetch 1 cái id mà ko biết id đó đã có trong db hay chưa
+},{"./Model":"src/models/Model.ts","./Attributes":"src/models/Attributes.ts","./ApiSync":"src/models/ApiSync.ts","./Eventing":"src/models/Eventing.ts","./Collection":"src/models/Collection.ts"}],"src/index.ts":[function(require,module,exports) {
+"use strict";
+/* import { User } from "./models/User";
 
-var __importDefault = this && this.__importDefault || function (mod) {
-  return mod && mod.__esModule ? mod : {
-    "default": mod
-  };
-};
+const user = User.buildUser({ id: 1 });
+
+//set up event listener
+user.on("change", () => {
+  console.log(user);
+});
+
+user.fetch();
+import { User } from "./models/User";
+
+// const collection = new Collection<User, UserProps>(
+//   "http://localhost:3000/users",
+//   (json: UserProps) => User.buildUser(json)
+// ); ko nên initialize collection ở đây
+
+const collection = User.buildUserCollection();
+
+collection.on("change", () => {
+  console.log(collection);
+});
+
+collection.fetch(); */
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+/* import { UserEdit } from "./views/UserEdit";
+import { User } from "./models/User";
 
-var axios_1 = __importDefault(require("axios"));
+//pass vào 1 cái element mà muốn render cái form ra cái element đấy
+const user = User.buildUser({ name: "Jumong", age: 45 });
 
-var User_1 = require("./User");
+const root = document.getElementById("root");
 
-var Eventing_1 = require("./Eventing");
+if (root) {
+  //type guard vì strictNullCheck on
+  const userEdit = new UserEdit(root, user);
+  userEdit.render(); //chạy lại parcel.html
+  console.log(userEdit);
+} else {
+  throw new Error("Root element not found");
+}
+ */
 
-var Collection =
-/** @class */
-function () {
-  function Collection(rootUrl) {
-    this.rootUrl = rootUrl;
-    this.models = [];
-    this.events = new Eventing_1.Eventing();
-  }
+var UserList_1 = require("./views/UserList");
 
-  Object.defineProperty(Collection.prototype, "on", {
-    get: function get() {
-      return this.events.on; //ko đc dùng shortcut on = ... khi initialize Eventing inline như trên kia
-    },
-    enumerable: true,
-    configurable: true
-  });
-  Object.defineProperty(Collection.prototype, "trigger", {
-    get: function get() {
-      return this.events.trigger;
-    },
-    enumerable: true,
-    configurable: true
-  });
-
-  Collection.prototype.fetch = function () {
-    var _this = this; //take the value from res, take each of the object and turn into an instance of User and add to the models array
-
-
-    axios_1.default.get(this.rootUrl).then(function (res) {
-      res.data.forEach(function (value) {
-        var user = User_1.User.buildUser(value);
-
-        _this.models.push(user);
-      });
-
-      _this.trigger("change");
-    });
-  };
-
-  return Collection;
-}();
-
-exports.Collection = Collection;
-},{"axios":"node_modules/axios/index.js","./User":"src/models/User.ts","./Eventing":"src/models/Eventing.ts"}],"src/index.ts":[function(require,module,exports) {
-"use strict"; // import { User } from "./models/User";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-}); // const user = User.buildUser({ id: 1 });
-// //set up event listener
-// user.on("change", () => {
-//   console.log(user);
-// });
-// user.fetch();
+var UserEdit_1 = require("./views/UserEdit");
 
 var Collection_1 = require("./models/Collection");
 
-var collection = new Collection_1.Collection("http://localhost:3000/users");
-collection.on("change", function () {
-  console.log(collection);
+var User_1 = require("./models/User");
+
+var users = new Collection_1.Collection("http://localhost:3000/users", function (json) {
+  return User_1.User.buildUser(json);
+}); //fetch all the users from json server and trigger 'change' event (mỗi lần fetch mới là render lại)
+
+users.on("change", function () {
+  var root = document.getElementById("root");
+
+  if (root) {
+    new UserList_1.UserList(root, users).render();
+  }
 });
-collection.fetch();
-},{"./models/Collection":"src/models/Collection.ts"}],"../../../../usr/local/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+users.fetch();
+var singleUser = User_1.User.buildUser({
+  id: 1
+});
+var sub = document.getElementById("sub");
+
+if (sub) {
+  new UserEdit_1.UserEdit(sub, singleUser).render();
+}
+},{"./views/UserList":"src/views/UserList.ts","./views/UserEdit":"src/views/UserEdit.ts","./models/Collection":"src/models/Collection.ts","./models/User":"src/models/User.ts"}],"../../../../usr/local/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -2248,7 +2756,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "49466" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "49307" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
